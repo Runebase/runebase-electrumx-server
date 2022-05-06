@@ -485,7 +485,7 @@ class DecredDaemon(Daemon):
         return aiohttp.TCPConnector(verify_ssl=False)
 
 
-class QtumDaemon(Daemon):
+class RunebaseDaemon(Daemon):
 
     async def callcontract(self, address, data, sender):
         return await self._send_single('callcontract', (address, data, sender))

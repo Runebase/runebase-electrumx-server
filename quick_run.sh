@@ -5,7 +5,7 @@
 
 
 # configure electrumx
-export COIN=Qtum
+export COIN=Runebase
 export DAEMON_URL=http://rpcuser:rpcpassword@127.0.0.1
 export NET=mainnet
 export DB_DIRECTORY=$HOME/.electrumx/db
