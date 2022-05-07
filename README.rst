@@ -25,3 +25,9 @@ Documentation
 
 See `readthedocs <https://electrumx-spesmilo.readthedocs.io/>`_.
 
+
+Crontab start and optimize
+==========================
+
+@reboot sleep 45 && sh /home/bago/runebase-electrumx-server/start.sh
+33 3 * * 3 sh /home/bago/runebase-electrumx-server/stop.sh && export COIN=Runebase; export DB_DIRECTORY=/home/bago/.electrumx/db; /home/bago/runebase-electrumx-server/electrumx_compact_history && sh /home/bago/runebase-electrumx-server/start.sh
