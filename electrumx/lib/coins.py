@@ -293,8 +293,8 @@ class Runebase(Coin):
     P2SH_VERBYTES = [bytes.fromhex("7b")]
     WIF_BYTE = bytes.fromhex("d8")
     GENESIS_HASH = '0000208ee7a300f2baaf39f8524bf1bd6ed90db885d97b26e1a229f44ff73b9a'
-    TX_COUNT = 1244691
-    TX_COUNT_HEIGHT = 618927
+    TX_COUNT = 1739477
+    TX_COUNT_HEIGHT = 865088
     TX_PER_BLOCK = 1800
     PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     PEERS = []
@@ -361,8 +361,8 @@ class RunebaseTestnet(Runebase):
     XPRV_VERBYTES = bytes.fromhex("053784a4")
     GENESIS_HASH = '0000019d9d91d1c7fd440938747eed3ca13a2d2c0533054115f147ab0da69d46'
     REORG_LIMIT = 8000
-    TX_COUNT = 662696
-    TX_COUNT_HEIGHT = 333124
+    TX_COUNT = 14201
+    TX_COUNT_HEIGHT = 8823
     TX_PER_BLOCK = 21
     PEERS = []
     PEER_DEFAULT_PORTS = {'t': '51001', 's': '51002'}
