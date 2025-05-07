@@ -755,7 +755,9 @@ class SessionManager:
         return electrum_header
 
     async def broadcast_transaction(self, raw_tx):
-        hex_hash = await self.daemon.broadcast_transaction(raw_tx)
+        '''Broadcast a raw transaction to the network.'''
+        maxfeerate_runes = 9.99999999
+        hex_hash = await self.daemon.broadcast_transaction(raw_tx, maxfeerate=maxfeerate_runes)
         self.txs_sent += 1
         return hex_hash
 
