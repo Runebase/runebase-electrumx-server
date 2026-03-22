@@ -520,15 +520,15 @@ class DB:
 
         return [self.coin.header_hash(header) for header in headers]
 
-    async def limited_history(self, hashX, *, limit=1000):
+    async def limited_history(self, hashX, *, limit=1000, offset=0):
         '''Return an unpruned, sorted list of (tx_hash, height) tuples of
         confirmed transactions that touched the address, earliest in
         the blockchain first.  Includes both spending and receiving
         transactions.  By default returns at most 1000 entries.  Set
-        limit to None to get them all.
+        limit to None to get them all.  offset skips that many entries.
         '''
         def read_history():
-            tx_nums = list(self.history.get_txnums(hashX, limit))
+            tx_nums = list(self.history.get_txnums(hashX, limit, offset))
             fs_tx_hash = self.fs_tx_hash
             return [fs_tx_hash(tx_num) for tx_num in tx_nums]
 
@@ -540,15 +540,14 @@ class DB:
                                 f'not found (reorg?), retrying...')
             await sleep(0.25)
 
-    async def limited_eventlog(self, hashY_topic, *, limit=1000):
-        '''Return an unpruned, sorted list of (tx_hash, height) tuples of
-        confirmed transactions that touched the address, earliest in
-        the blockchain first.  Includes both spending and receiving
-        transactions.  By default returns at most 1000 entries.  Set
-        limit to None to get them all.
+    async def limited_eventlog(self, hashY_topic, *, limit=1000, offset=0):
+        '''Return an unpruned, sorted list of (tx_hash, height, log_index)
+        tuples of confirmed contract events.  Earliest in the blockchain
+        first.  By default returns at most 1000 entries.  Set limit to
+        None to get them all.  offset skips that many entries.
         '''
         def read_eventlog():
-            datas = list(self.eventlog.get_txnums(hashY_topic, limit))
+            datas = list(self.eventlog.get_txnums(hashY_topic, limit, offset))
             fs_tx_hash = self.fs_tx_hash
             return [fs_tx_hash(tx_num) + (log_index, ) for (tx_num, log_index) in datas]
 

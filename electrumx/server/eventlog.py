@@ -172,13 +172,16 @@ class Eventlog(object):
 
         self.logger.info(f'backing up removed {nremoves:,d} eventlog entries')
 
-    def get_txnums(self, key, limit=1000):
+    def get_txnums(self, key, limit=1000, offset=0):
         limit = util.resolve_limit(limit)
+        skipped = 0
         for key, hist in self.db.iterator(prefix=key):
             a = array.array('Q')
             a.frombytes(hist)
-            # 把一维数据恢复成2*2维
             for i in range(len(a)//2):
+                if skipped < offset:
+                    skipped += 1
+                    continue
                 if limit == 0:
                     return
                 tx_num, log_index = a[2*i: 2*i+2]

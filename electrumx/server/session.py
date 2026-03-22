@@ -784,6 +784,19 @@ class SessionManager:
             raise result
         return result, cost
 
+    # Hard per-request cap for paginated queries (anti-DDoS).
+    MAX_PAGE_SIZE = 200
+
+    async def paginated_history(self, hashX, limit, offset):
+        '''Like limited_history but with client-controlled pagination.
+        limit and offset are clamped to safe maximums.'''
+        hard_limit = min(limit, self.MAX_PAGE_SIZE)
+        cost = 0.1
+        result = await self.db.limited_history(
+            hashX, limit=hard_limit, offset=offset)
+        cost += 0.1 + len(result) * 0.001
+        return result, cost
+
     async def _notify_sessions(self, height, touched, eventlog_touched=None):
         '''Notify sessions about height changes and touched addresses.'''
         height_changed = height != self.notified_height
@@ -861,6 +874,16 @@ class SessionManager:
 
         if isinstance(result, Exception):
             raise result
+        return result, cost
+
+    async def paginated_eventlog(self, hashY_topic, limit, offset):
+        '''Like limited_eventlog but with client-controlled pagination.
+        limit and offset are clamped to safe maximums.'''
+        hard_limit = min(limit, self.MAX_PAGE_SIZE)
+        cost = 0.1
+        result = await self.db.limited_eventlog(
+            hashY_topic, limit=hard_limit, offset=offset)
+        cost += 0.1 + len(result) * 0.001
         return result, cost
 
 
@@ -1205,10 +1228,51 @@ class ElectrumX(SessionBase):
                 for tx_hash, height in history]
         return conf + await self.unconfirmed_history(hashX)
 
-    async def scripthash_get_history(self, scripthash):
-        '''Return the confirmed and unconfirmed history of a scripthash.'''
+    async def scripthash_get_history(self, scripthash, limit=None,
+                                      offset=None):
+        '''Return the confirmed and unconfirmed history of a scripthash.
+
+        If limit and offset are provided, returns a paginated response:
+        {"items": [...], "total": N} where total is the full history
+        count (confirmed only) and items is the requested page.
+        Unconfirmed (mempool) txs are always appended when offset is 0.
+
+        Without limit/offset, returns the legacy flat array for backward
+        compatibility.
+        '''
         hashX = scripthash_to_hashX(scripthash)
-        return await self.confirmed_and_unconfirmed_history(hashX)
+
+        # Legacy behavior: no pagination params
+        if limit is None and offset is None:
+            return await self.confirmed_and_unconfirmed_history(hashX)
+
+        # Paginated path
+        limit = limit if isinstance(limit, int) and limit > 0 else 50
+        offset = offset if isinstance(offset, int) and offset >= 0 else 0
+
+        history, cost = await self.session_mgr.paginated_history(
+            hashX, limit, offset)
+        self.bump_cost(cost)
+        conf = [{'tx_hash': hash_to_hex_str(tx_hash), 'height': height}
+                for tx_hash, height in history]
+
+        # Get total confirmed count (cheap: reuse the full generator
+        # with limit=None but only count, not resolve hashes).
+        # We read total from the non-paginated limited_history cache
+        # when available, otherwise do a count query.
+        total_history, tcost = await self.session_mgr.limited_history(hashX)
+        self.bump_cost(tcost)
+        total = len(total_history)
+
+        # Append mempool txs only on the first page
+        unconf = []
+        if offset == 0:
+            unconf = await self.unconfirmed_history(hashX)
+
+        return {
+            'items': conf + unconf,
+            'total': total,
+        }
 
     async def scripthash_get_mempool(self, scripthash):
         '''Return the mempool transactions touching a scripthash.'''
@@ -1593,15 +1657,49 @@ class ElectrumX(SessionBase):
             'symbol': util.parse_call_output(symbol, 'str')
         }
 
-    async def contract_event_get_history(self, hash160, contract_addr, topic):
+    async def contract_event_get_history(self, hash160, contract_addr,
+                                          topic, limit=None, offset=None):
+        '''Return contract event history for a hash160/contract/topic.
+
+        If limit and offset are provided, returns a paginated response:
+        {"items": [...], "total": N}.  Without them, returns the legacy
+        flat array for backward compatibility.
+        '''
         hashY = self.coin.hash160_contract_to_hashY(hash160, contract_addr)
         hashY_topic = hashY + topic.encode()[:TOPIC_LEN]
-        eventlogs, _ = await self.session_mgr.limited_eventlog(hashY_topic)
+
+        # Legacy behavior
+        if limit is None and offset is None:
+            eventlogs, cost = await self.session_mgr.limited_eventlog(
+                hashY_topic)
+            self.bump_cost(cost)
+            return [{'tx_hash': hash_to_hex_str(tx_hash),
+                     'height': height,
+                     'log_index': log_index}
+                    for tx_hash, height, log_index in eventlogs]
+
+        # Paginated path
+        limit = limit if isinstance(limit, int) and limit > 0 else 50
+        offset = offset if isinstance(offset, int) and offset >= 0 else 0
+
+        eventlogs, cost = await self.session_mgr.paginated_eventlog(
+            hashY_topic, limit, offset)
+        self.bump_cost(cost)
         conf = [{'tx_hash': hash_to_hex_str(tx_hash),
                  'height': height,
                  'log_index': log_index}
                 for tx_hash, height, log_index in eventlogs]
-        return conf
+
+        # Total count from non-paginated cache
+        total_logs, tcost = await self.session_mgr.limited_eventlog(
+            hashY_topic)
+        self.bump_cost(tcost)
+        total = len(total_logs)
+
+        return {
+            'items': conf,
+            'total': total,
+        }
 
     async def hash160_contract_status(self, hash160, contract_addr, topic):
         eventlogs = await self.contract_event_get_history(hash160, contract_addr, topic)

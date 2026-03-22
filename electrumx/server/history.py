@@ -208,16 +208,21 @@ class History:
 
         self.logger.info(f'backing up removed {nremoves:,d} history entries')
 
-    def get_txnums(self, hashX, limit=1000):
+    def get_txnums(self, hashX, limit=1000, offset=0):
         '''Generator that returns an unpruned, sorted list of tx_nums in the
         history of a hashX.  Includes both spending and receiving
         transactions.  By default yields at most 1000 entries.  Set
-        limit to None to get them all.  '''
+        limit to None to get them all.  offset skips that many entries
+        before yielding.'''
         limit = util.resolve_limit(limit)
         chunks = util.chunks
         txnum_padding = bytes(8-TXNUM_LEN)
+        skipped = 0
         for _key, hist in self.db.iterator(prefix=hashX):
             for tx_numb in chunks(hist, TXNUM_LEN):
+                if skipped < offset:
+                    skipped += 1
+                    continue
                 if limit == 0:
                     return
                 tx_num, = unpack_le_uint64(tx_numb + txnum_padding)
