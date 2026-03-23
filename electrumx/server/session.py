@@ -1068,7 +1068,9 @@ class ElectrumX(SessionBase):
         '''
         try:
             await self._notify_inner(touched, eventlog_touched, height_changed)
-        except (ConnectionError, OSError, asyncio.CancelledError):
+        except asyncio.CancelledError:
+            raise
+        except (ConnectionError, OSError):
             self.logger.info('connection gone during notify, closing session')
             await self.close(force_after=1)
         except Exception:
