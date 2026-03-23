@@ -1066,6 +1066,16 @@ class ElectrumX(SessionBase):
         '''Notify the client about changes to touched addresses (from mempool
         updates or new blocks) and height.
         '''
+        try:
+            await self._notify_inner(touched, eventlog_touched, height_changed)
+        except (ConnectionError, OSError, asyncio.CancelledError):
+            self.logger.info('connection gone during notify, closing session')
+            await self.close(force_after=1)
+        except Exception:
+            self.logger.exception('unexpected error during notify, closing session')
+            await self.close(force_after=1)
+
+    async def _notify_inner(self, touched, eventlog_touched, height_changed):
         if height_changed and self.subscribe_headers:
             args = (await self.subscribe_headers_result(), )
             await self.send_notification('blockchain.headers.subscribe', args)
